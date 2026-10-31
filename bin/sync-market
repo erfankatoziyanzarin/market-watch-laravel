@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_dir="$(cd "$(dirname "$0")/.." && pwd)"
+php_binary="${1:-php}"
+
+cd "$project_dir"
+exec /usr/bin/timeout --signal=TERM --kill-after=5s 40s \
+    "$php_binary" "$project_dir/artisan" instruments:sync

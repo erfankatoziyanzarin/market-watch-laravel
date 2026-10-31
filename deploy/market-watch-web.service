@@ -1,0 +1,18 @@
+[Unit]
+Description=Market Watch Laravel web server
+Requires=market-watch-mysql.service
+After=market-watch-mysql.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/market-watch
+ExecStartPre=/var/www/market-watch/bin/wait-for-db
+ExecStart=/usr/bin/php /var/www/market-watch/artisan serve --host=127.0.0.1 --port=8013
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=50
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

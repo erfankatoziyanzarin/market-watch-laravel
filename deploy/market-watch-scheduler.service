@@ -1,0 +1,20 @@
+[Unit]
+Description=Laravel Market Watch scheduler
+Requires=market-watch-mysql.service
+After=market-watch-mysql.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/market-watch
+ExecStartPre=/var/www/market-watch/bin/wait-for-db
+ExecStart=/usr/bin/php /var/www/market-watch/artisan schedule:work --no-interaction
+Restart=always
+RestartSec=5
+KillMode=control-group
+TimeoutStopSec=50
+TimeoutStartSec=50
+
+[Install]
+WantedBy=default.target

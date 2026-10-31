@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_dir="$(cd "$(dirname "$0")/.." && pwd)"
+socket_path="$project_dir/storage/mysql.sock"
+data_path="$project_dir/storage/mysql-data"
+case "${1:-start}" in
+  start)
+    if mysqladmin --socket="$socket_path" -u root ping >/dev/null 2>&1; then
+      echo 'Project MySQL is already running.'
+      exit 0
+    fi
+    if [[ -e "$socket_path.lock" || -S "$socket_path" ]]; then
+      if ss -xln | rg -Fq "$socket_path"; then
+        echo 'MySQL socket is in use but did not answer the health check.' >&2
+        exit 1
+      fi
+      rm -f "$socket_path" "$socket_path.lock"
+    fi
+    mkdir -p "$project_dir/work"
+    if [[ ! -x "$project_dir/work/mysqld" ]]; then
+      cp /usr/sbin/mysqld "$project_dir/work/mysqld"
+    fi
+    if [[ ! -d "$data_path/mysql" ]]; then
+      "$project_dir/work/mysqld" --no-defaults --basedir=/usr --initialize-insecure --datadir="$data_path" --log-error="$project_dir/storage/mysql-initialize.log"
+    fi
+    chmod 700 "$data_path"
+    "$project_dir/work/mysqld" --no-defaults --basedir=/usr --lc-messages-dir=/usr/share/mysql --datadir="$data_path" --socket="$socket_path" --pid-file="$project_dir/storage/mysql.pid" --log-error="$project_dir/storage/mysql.log" --skip-networking --skip-log-bin --mysqlx=0 --daemonize
+    chmod 600 "$socket_path"
+    mysql --socket="$socket_path" -u root <<'SQL'
+CREATE DATABASE IF NOT EXISTS market_watch CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS market_watch_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS market_watch_benchmark CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+SQL
+    echo 'Project MySQL started (Unix socket only).'
+    ;;
+  stop) mysqladmin --socket="$socket_path" -u root shutdown ;;
+  status) mysqladmin --socket="$socket_path" -u root ping ;;
+  *) echo 'Usage: bin/local-db start|stop|status' >&2; exit 1 ;;
+esac

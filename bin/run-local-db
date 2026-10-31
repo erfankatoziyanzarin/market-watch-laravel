@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_dir="$(cd "$(dirname "$0")/.." && pwd)"
+socket_path="$project_dir/storage/mysql.sock"
+data_path="$project_dir/storage/mysql-data"
+
+if [[ ! -x "$project_dir/work/mysqld" || ! -d "$data_path/mysql" ]]; then
+    echo 'Local MySQL is not initialized; run bin/local-db start once.' >&2
+    exit 1
+fi
+
+if [[ -S "$socket_path" || -e "$socket_path.lock" ]]; then
+    if ss -xln | rg -Fq "$socket_path"; then
+        echo 'Local MySQL socket is already in use.' >&2
+        exit 1
+    fi
+    rm -f "$socket_path" "$socket_path.lock"
+fi
+
+chmod 700 "$data_path"
+exec "$project_dir/work/mysqld" --no-defaults --basedir=/usr \
+    --lc-messages-dir=/usr/share/mysql --datadir="$data_path" \
+    --socket="$socket_path" --pid-file="$project_dir/storage/mysql.pid" \
+    --log-error="$project_dir/storage/mysql.log" --skip-networking --skip-log-bin --mysqlx=0
